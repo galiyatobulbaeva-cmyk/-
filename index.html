@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Resolution Coach — Debate Round Generator (Offline)</title>
+  <style>
+    :root { --pad: 14px; --radius: 16px; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:#f6f7fb; color:#111; }
+    header { padding:18px 20px; background:white; border-bottom:1px solid #e7e7ee; position:sticky; top:0; z-index:2;}
+    header h1 { margin:0; font-size:18px; }
+    header p { margin:6px 0 0; color:#555; font-size:13px; }
+    .wrap { padding:14px; max-width: 1100px; margin:0 auto; display:grid; gap:14px; }
+    .grid { display:grid; grid-template-columns: 1fr 1fr; gap:14px; }
+    .card { background:white; border:1px solid #e7e7ee; border-radius: var(--radius); overflow:hidden; }
+    .card .hd { padding: var(--pad); border-bottom:1px solid #eee; background:#fff; }
+    .card .hd h2 { margin:0; font-size:14px; color:#333; }
+    .card .bd { padding: var(--pad); }
+    label { font-size:12px; color:#555; display:block; margin:10px 0 6px; }
+    input[type="text"], select {
+      width:100%; padding:10px 10px; border:1px solid #dcdce6; border-radius: 12px; font-size:14px; background:#fff;
+      box-sizing:border-box;
+    }
+    .row { display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .row3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; }
+    .btns { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+    button {
+      border:1px solid #dcdce6; background:#fff; padding:10px 12px; border-radius: 12px;
+      font-size:13px; cursor:pointer;
+    }
+    button.primary { background:#111; color:#fff; border-color:#111; }
+    button:active { transform: translateY(1px); }
+    .pill { display:inline-block; font-size:11px; padding:2px 8px; border:1px solid #e2e2ef; border-radius:999px; margin-right:6px; color:#444; background:#fbfbff; }
+    .big { font-size:18px; font-weight:700; margin:6px 0 0; }
+    .motion { font-size:16px; font-weight:650; margin:10px 0 0; line-height:1.25; }
+    .muted { color:#666; font-size:13px; }
+    .kv { margin-top:10px; display:grid; gap:8px; }
+    .kv div { background:#fafafe; border:1px solid #eee; padding:10px 12px; border-radius: 12px; }
+    .kv strong { display:block; font-size:12px; color:#444; margin-bottom:4px; }
+    .kv span { display:block; font-size:14px; color:#111; line-height:1.3; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; }
+    .hint { font-size:12px; color:#666; margin-top:10px; }
+    .small { font-size:12px; color:#666; }
+    .divider { height:1px; background:#eee; margin:12px 0; }
+    .teamCard { background:#fafafe; border:1px solid #eee; padding:12px; border-radius: 14px; }
+    .teamTitle { font-weight:700; margin:0 0 6px; }
+    .badge { display:inline-block; font-size:11px; padding:2px 8px; border-radius:999px; background:#fff; border:1px solid #e2e2ef; color:#444; margin-left:6px; }
+    .note { background:#fff7e6; border:1px solid #ffe0a3; padding:10px 12px; border-radius: 12px; font-size:12px; color:#6b4c00; }
+  </style>
+</head>
+<body>
+<header>
+  <h1>AI Resolution Coach — Debate Round Generator (Offline)</h1>
+  <p>Выбираешь формат (БПФ / АПФ / ВШФ) → вводишь команды и участников → <span class="mono">Start round</span> → роли + резолюция рандомно, сразу тема/keywords/phrases + таймеры.</p>
+</header>
+
+<div class="wrap">
+  <section class="card">
+    <div class="hd"><h2>Setup</h2></div>
+    <div class="bd">
+      <div class="row3">
+        <div>
+          <label>Формат дебатов</label>
+          <select id="format">
+            <option value="WSF" selected>ВШФ (World Schools)</option>
+            <option value="APF">АПФ (Asian Parliamentary)</option>
+            <option value="BPF">БПФ (British Parliamentary)</option>
+          </select>
+        </div>
+        <div>
+          <label>Количество команд</label>
+          <select id="teamCount"></select>
+          <div class="hint">Для БПФ всегда 4 команды (OG/OO/CG/CO).</div>
+        </div>
+        <div>
+          <label>Фильтр темы (опционально)</label>
+          <select id="themeFilter"></select>
+        </div>
+      </div>
+
+      <div class="note" style="margin-top:10px;">
+        <b>Подсказка:</b> ВШФ/АПФ — по 2 команды. БПФ — 4 команды. Участники вводятся по командам (по умолчанию: ВШФ/АПФ = 3 спикера, БПФ = 2 спикера).
+      </div>
+
+      <div class="divider"></div>
+
+      <div id="teamsContainer" class="kv" style="margin-top:0;">
+        <div class="muted">Выбери формат/количество команд — ниже появятся поля для команд и участников.</div>
+      </div>
+
+      <div class="btns">
+        <button class="primary" id="startBtn">Start round</button>
+        <button id="rerollSides">Reroll roles</button>
+        <button id="rerollMotion">New motion</button>
+        <button id="copyBtn">Copy summary</button>
+        <button id="resetBtn">Reset</button>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="row">
+        <div>
+          <label>Таймер подготовки (мин:сек)</label>
+          <div class="row">
+            <input id="prepMin" type="text" value="3" inputmode="numeric" placeholder="мин" />
+            <input id="prepSec" type="text" value="0" inputmode="numeric" placeholder="сек" />
+          </div>
+          <div class="hint">Напр.: 3:00 или 5:00. Нажми <span class="mono">Start prep</span>.</div>
+        </div>
+        <div>
+          <label>Сигнал</label>
+          <div class="row">
+            <select id="soundType">
+              <option value="beep" selected>Beep</option>
+              <option value="chime">Chime</option>
+              <option value="double">Double beep</option>
+            </select>
+            <select id="soundEnabled">
+              <option value="on" selected>Sound: ON</option>
+              <option value="off">Sound: OFF</option>
+            </select>
+          </div>
+          <label style="margin-top:10px;">Громкость</label>
+          <input id="volume" type="range" min="0" max="100" value="50" />
+        </div>
+      </div>
+
+      <div class="btns">
+        <button class="primary" id="prepStart">Start prep</button>
+        <button id="prepPause">Pause</button>
+        <button id="prepReset">Reset timer</button>
+      </div>
+
+      <div class="kv" style="margin-top:10px;">
+        <div>
+          <strong>Prep timer</strong>
+          <span class="mono" id="prepDisplay">03:00</span>
+          <div style="margin-top:10px; background:#f0f1ff; border:1px solid #e2e3ff; border-radius: 999px; overflow:hidden;">
+            <div id="prepBar" style="height:10px; width:0%; background:#111;"></div>
+          </div>
+        </div>
+        <div>
+          <strong>POI question (15s)</strong>
+          <span id="poiQuestion" class="mono" data-q="—">—</span>
+          <div style="margin-top:10px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="primary" id="poiBtn15">Ask POI (15s)</button>
+            <button id="poiStop">Stop</button>
+          </div>
+          <div class="hint">Правило: у отвечающего 15 секунд на короткий ответ (1–2 предложения).</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="grid">
+    <section class="card">
+      <div class="hd"><h2>Round</h2></div>
+      <div class="bd" id="roundBox">
+        <div class="muted">Заполни команды/участников и нажми <span class="mono">Start round</span>.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="hd"><h2>Quick teacher view</h2></div>
+      <div class="bd" id="teacherBox">
+        <div class="muted">Здесь появится краткая “карточка раунда” для учителя.</div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card">
+    <div class="hd"><h2>Bank</h2></div>
+    <div class="bd small">
+      Добавляй новые резолюции в массив <span class="mono">BANK</span>. Можно позже расширить: импорт/экспорт JSON.
+    </div>
+  </section>
+</div>
+
+<script>
+  const BANK = [
+    { theme:"School Uniform", motion:"Students should wear school uniforms.", keywords:["uniform","equality","rules","comfortable"], phrases:["In my opinion…","I agree because…","I disagree because…"] },
+    { theme:"Mobile Phones in Class", motion:"Mobile phones should be allowed in class.", keywords:["phone","learning","distraction","rules"], phrases:["I think…","Another point is…","On the other hand…"] },
+    { theme:"Homework", motion:"Schools should give less homework.", keywords:["homework","free time","practice","stress"], phrases:["From my point of view…","One example is…","That is why…"] },
+    { theme:"Sports at School", motion:"Sports should be more important at school.", keywords:["health","teamwork","competition","exercise"], phrases:["I believe…","It is clear that…","Finally…"] },
+    { theme:"Exams", motion:"Exams are the best way to check knowledge.", keywords:["stress","tests","marks","skills"], phrases:["I agree because…","One example is…","In contrast…"] },
+    { theme:"School Subjects", motion:"Students should choose their subjects.", keywords:["freedom","choice","study","future"], phrases:["From my point of view…","Another reason is…","That is why…"] },
+    { theme:"Video Games", motion:"Video games are good for children.", keywords:["fun","addiction","skills","time"], phrases:["I strongly believe…","There is no doubt that…","On the other hand…"] },
+    { theme:"Robots", motion:"Robots should help people at home.", keywords:["robots","future","technology","jobs"], phrases:["I think…","It is important to note that…","Finally…"] },
+    { theme:"Online Learning", motion:"Online learning is better than traditional school.", keywords:["technology","comfort","teacher","classmates"], phrases:["In my opinion…","Some people believe…","On the other hand…"] },
+    { theme:"Artificial Intelligence", motion:"Artificial intelligence will replace teachers.", keywords:["robots","education","jobs","future"], phrases:["I strongly believe…","In my opinion…","On the other hand…"] }
+  ];
+
+  const $ = (id) => document.getElementById(id);
+  const uniq = (arr) => [...new Set(arr)].sort((a,b)=>a.localeCompare(b));
+  const safeJoin = (arr) => (arr || []).filter(Boolean).join(", ");
+  const pad2 = (n) => String(Math.max(0, Math.floor(Number(n)||0))).padStart(2,"0");
+
+  function detectType(motion) {
+    const m = (motion || "").toLowerCase().trim();
+    if (m.includes(" should ")) return "Policy";
+    if (m.includes(" is better than ") || m.includes(" more important than ")) return "Comparative";
+    if (m.includes(" are ") || m.includes(" is ")) return "Value/Fact";
+    return "General";
+  }
+  function shuffle(arr){
+    const a = [...arr];
+    for (let i=a.length-1; i>0; i--){
+      const j = Math.floor(Math.random()*(i+1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  function fillThemeFilter() {
+    const themes = uniq(["All", ...BANK.map(x=>x.theme)]);
+    $("themeFilter").innerHTML = themes.map(t=>`<option value="${t}">${t}</option>`).join("");
+    $("themeFilter").value = "All";
+  }
+  function pickRandomMotion() {
+    const theme = $("themeFilter").value;
+    const candidates = BANK.filter(x => theme==="All" ? true : x.theme===theme);
+    return candidates.length ? candidates[Math.floor(Math.random()*candidates.length)] : null;
+  }
+
+  const FORMAT_SPECS = {
+    WSF: { teamsAllowed:[2], speakersPerTeam:3, replyOptional:true },
+    APF: { teamsAllowed:[2], speakersPerTeam:3, replyOptional:false },
+    BPF: { teamsAllowed:[4], speakersPerTeam:2, replyOptional:false }
+  };
+  const BP_ROLES = ["Opening Government (OG)", "Opening Opposition (OO)", "Closing Government (CG)", "Closing Opposition (CO)"];
+
+  function fillTeamCount() {
+    const fmt = $("format").value;
+    const allowed = FORMAT_SPECS[fmt].teamsAllowed;
+    $("teamCount").innerHTML = allowed.map(n=>`<option value="${n}">${n}</option>`).join("");
+    $("teamCount").value = String(allowed[0]);
+    $("teamCount").disabled = (allowed.length===1);
+  }
+
+  function renderTeamsForm() {
+    const fmt = $("format").value;
+    const spec = FORMAT_SPECS[fmt];
+    const nTeams = Number($("teamCount").value || spec.teamsAllowed[0]);
+    const spk = spec.speakersPerTeam;
+    const reply = spec.replyOptional;
+
+    let html = "";
+    for (let i=0; i<nTeams; i++){
+      const teamLabel = (fmt==="BPF") ? BP_ROLES[i] : `Team ${i+1}`;
+      html += `
+        <div class="teamCard">
+          <div class="teamTitle">${teamLabel} <span class="badge">${spk} спикера</span>${reply ? `<span class="badge">Reply (опц.)</span>` : ""}</div>
+          <label>Название команды</label>
+          <input type="text" class="teamName" placeholder="Напр.: LORD Alpha" />
+          <div class="row" style="margin-top:8px;">
+            <div>
+              <label>Участник 1</label>
+              <input type="text" class="p1" placeholder="ФИО / Name" />
+            </div>
+            <div>
+              <label>Участник 2</label>
+              <input type="text" class="p2" placeholder="ФИО / Name" />
+            </div>
+          </div>
+          ${spk>=3 ? `
+          <div class="row" style="margin-top:8px;">
+            <div>
+              <label>Участник 3</label>
+              <input type="text" class="p3" placeholder="ФИО / Name" />
+            </div>
+            <div>
+              <label>${reply ? "Reply speaker (опционально)" : "Примечание (опционально)"}</label>
+              <input type="text" class="p4" placeholder="${reply ? "ФИО / Name" : "например: капитан"}" />
+            </div>
+          </div>
+          ` : ""}
+        </div>
+      `;
+    }
+    $("teamsContainer").innerHTML = html;
+  }
+
+  function readTeamsFromForm() {
+    const fmt = $("format").value;
+    const spec = FORMAT_SPECS[fmt];
+    const nTeams = Number($("teamCount").value || spec.teamsAllowed[0]);
+    const cards = Array.from(document.querySelectorAll("#teamsContainer .teamCard"));
+    const teams = cards.slice(0, nTeams).map((card, idx) => {
+      const name = (card.querySelector(".teamName")?.value || "").trim();
+      const p1 = (card.querySelector(".p1")?.value || "").trim();
+      const p2 = (card.querySelector(".p2")?.value || "").trim();
+      const p3 = (card.querySelector(".p3")?.value || "").trim();
+      const p4 = (card.querySelector(".p4")?.value || "").trim();
+      const players = [p1,p2,p3,p4].filter(Boolean);
+      return { name: name || `Team ${idx+1}`, players };
+    });
+
+    const lower = teams.map(t=>t.name.toLowerCase());
+    const set = new Set(lower);
+    if (set.size !== lower.length) throw new Error("Названия команд должны быть разными (без повторов).");
+    return teams;
+  }
+
+  function assignRoles(format, teams) {
+    if (format === "BPF") {
+      const shuffled = shuffle(teams);
+      return BP_ROLES.map((role, i)=>({ role, team: shuffled[i] }));
+    }
+    const [a,b] = shuffle(teams);
+    const govLabel = (format==="WSF") ? "Proposition" : "Government";
+    return [{ role: govLabel, team: a }, { role: "Opposition", team: b }];
+  }
+
+  let current = { format:"WSF", teams:[], roles:[], item:null };
+
+  // Sound + timers
+  let audioCtx = null;
+  function playTone(freq, durationMs, volume01){
+    try{
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = freq; g.gain.value = volume01;
+      o.connect(g); g.connect(audioCtx.destination);
+      o.start();
+      setTimeout(()=>{ try{ o.stop(); }catch{} }, durationMs);
+    }catch(e){}
+  }
+  function playSignal(){
+    if ($("soundEnabled").value === "off") return;
+    const vol = (Number($("volume").value||50)/100) * 0.35;
+    const t = $("soundType").value || "beep";
+    if (t==="beep") playTone(880, 180, vol);
+    else if (t==="chime") { playTone(988, 140, vol); setTimeout(()=>playTone(784, 220, vol), 160); }
+    else { playTone(880, 140, vol); setTimeout(()=>playTone(880, 140, vol), 200); }
+  }
+
+  let prep = { total:180, left:180, running:false, interval:null };
+  function toSeconds(mm, ss){ return (Number(mm)||0)*60 + (Number(ss)||0); }
+  function updatePrepUI(){
+    const m = Math.floor(prep.left/60), s = prep.left%60;
+    $("prepDisplay").textContent = `${pad2(m)}:${pad2(s)}`;
+    const pct = prep.total ? (1-(prep.left/prep.total))*100 : 0;
+    $("prepBar").style.width = `${Math.max(0, Math.min(100, pct))}%`;
+  }
+  function setPrepFromInputs(){
+    const total = Math.max(5, toSeconds(($("prepMin").value||"0").trim(), ($("prepSec").value||"0").trim()));
+    prep.total = total; prep.left = total; updatePrepUI();
+  }
+  function stopPrep(resetRunning=true){
+    if (prep.interval) clearInterval(prep.interval);
+    prep.interval = null;
+    if (resetRunning) prep.running = false;
+  }
+  function startPrep(){
+    if (prep.running) return;
+    if ($("soundEnabled").value !== "off") playTone(1,1,0);
+    prep.running = true;
+    prep.interval = setInterval(()=>{
+      if (prep.left>0){
+        prep.left -= 1; updatePrepUI();
+        if (prep.left===0){ stopPrep(); playSignal(); }
+      }
+    }, 1000);
+  }
+  function pausePrep(){ if (!prep.running) return; stopPrep(false); }
+  function resetPrep(){ stopPrep(); setPrepFromInputs(); }
+
+  const POI_QUESTIONS = ["Why do you think this will improve learning?","What about students who feel uncomfortable?","Do you have a real-life example?","How will the rules be enforced?"];
+  let poiTimer = { left:15, interval:null };
+  function updatePoiUI(){
+    const base = $("poiQuestion").getAttribute("data-q") || "—";
+    $("poiQuestion").textContent = `${base}  [${pad2(poiTimer.left)}s]`;
+  }
+  function stopPOI(){
+    if (poiTimer.interval) clearInterval(poiTimer.interval);
+    poiTimer.interval = null; updatePoiUI();
+  }
+  function startPOI15(){
+    if ($("soundEnabled").value !== "off") playTone(1,1,0);
+    const q = POI_QUESTIONS[Math.floor(Math.random()*POI_QUESTIONS.length)];
+    $("poiQuestion").setAttribute("data-q", q);
+    poiTimer.left = 15; updatePoiUI();
+    if (poiTimer.interval) clearInterval(poiTimer.interval);
+    poiTimer.interval = setInterval(()=>{
+      poiTimer.left -= 1; updatePoiUI();
+      if (poiTimer.left<=0){ stopPOI(); playSignal(); }
+    }, 1000);
+  }
+
+  function renderRound() {
+    if (!current.item || !current.roles.length) {
+      $("roundBox").innerHTML = '<div class="muted">Заполни команды/участников и нажми <span class="mono">Start round</span>.</div>';
+      $("teacherBox").innerHTML = '<div class="muted">Здесь появится краткая “карточка раунда” для учителя.</div>';
+      return;
+    }
+    const it = current.item;
+    const type = detectType(it.motion);
+    const fmt = current.format;
+
+    const rolesHtml = current.roles.map(r=>{
+      const players = r.team.players?.length ? ` — <span class="small">${r.team.players.join(", ")}</span>` : "";
+      return `<div class="big">${r.role}: ${r.team.name}${players}</div>`;
+    }).join("");
+
+    $("roundBox").innerHTML = `
+      <div>
+        <span class="pill">Format: ${fmt}</span>
+        <span class="pill">Type: ${type}</span>
+        <span class="pill">Theme: ${it.theme}</span>
+      </div>
+      <div class="motion">${it.motion}</div>
+      <div class="divider"></div>
+      ${rolesHtml}
+      <div class="kv">
+        <div><strong>Keywords</strong><span>${safeJoin(it.keywords)}</span></div>
+        <div><strong>Useful phrases</strong><span>${safeJoin(it.phrases)}</span></div>
+      </div>
+    `;
+
+    const teacherLines = current.roles.map(r=>{
+      const players = r.team.players?.length ? ` (${r.team.players.join(", ")})` : "";
+      return `• ${r.role}: ${r.team.name}${players}`;
+    }).join("<br>");
+
+    $("teacherBox").innerHTML = `
+      <div><span class="pill">${it.theme}</span><span class="pill">${type}</span><span class="pill">Format: ${fmt}</span></div>
+      <div style="margin-top:8px;"><strong>Motion:</strong> ${it.motion}</div>
+      <div style="margin-top:10px;" class="small">${teacherLines}</div>
+      <div style="margin-top:10px;" class="small"><strong>Keywords:</strong> ${safeJoin(it.keywords)}</div>
+      <div class="small"><strong>Phrases:</strong> ${safeJoin(it.phrases)}</div>
+    `;
+  }
+
+  function startRound(){
+    try{
+      const fmt = $("format").value;
+      const teams = readTeamsFromForm();
+      current = { format: fmt, teams, roles: assignRoles(fmt, teams), item: pickRandomMotion() };
+      renderRound();
+    }catch(e){ alert(e.message || String(e)); }
+  }
+  function rerollRoles(){ if (!current.teams?.length) return startRound(); current.roles = assignRoles(current.format, current.teams); renderRound(); }
+  function rerollMotion(){ if (!current.teams?.length) return startRound(); current.item = pickRandomMotion(); renderRound(); }
+  function copySummary(){
+    if (!current.item || !current.roles.length) return alert("Сначала запусти раунд 🙂");
+    const it = current.item;
+    const roleLines = current.roles.map(r=>{
+      const players = r.team.players?.length ? ` | Players: ${r.team.players.join(", ")}` : "";
+      return `${r.role}: ${r.team.name}${players}`;
+    }).join("\n");
+    const text = `ROUND SUMMARY\nFormat: ${current.format}\nMotion: ${it.motion}\nTheme: ${it.theme}\n\n${roleLines}\n\nKeywords: ${safeJoin(it.keywords)}\nUseful phrases: ${safeJoin(it.phrases)}\n`;
+    navigator.clipboard.writeText(text).then(()=>alert("Скопировано!")).catch(()=>alert("Не удалось скопировать."));
+  }
+  function resetAll(){
+    current = { format: $("format").value, teams:[], roles:[], item:null };
+    stopPrep(); stopPOI();
+    $("poiQuestion").setAttribute("data-q","—"); $("poiQuestion").textContent = "—";
+    setPrepFromInputs();
+    renderTeamsForm();
+    renderRound();
+  }
+
+  // Init
+  fillThemeFilter();
+  fillTeamCount();
+  renderTeamsForm();
+  renderRound();
+  setPrepFromInputs();
+
+  $("format").addEventListener("change", ()=>{ fillTeamCount(); renderTeamsForm(); });
+  $("teamCount").addEventListener("change", renderTeamsForm);
+  $("startBtn").addEventListener("click", startRound);
+  $("rerollSides").addEventListener("click", rerollRoles);
+  $("rerollMotion").addEventListener("click", rerollMotion);
+  $("copyBtn").addEventListener("click", copySummary);
+  $("resetBtn").addEventListener("click", resetAll);
+
+  $("prepMin").addEventListener("change", setPrepFromInputs);
+  $("prepSec").addEventListener("change", setPrepFromInputs);
+  $("prepStart").addEventListener("click", startPrep);
+  $("prepPause").addEventListener("click", pausePrep);
+  $("prepReset").addEventListener("click", resetPrep);
+
+  $("poiBtn15").addEventListener("click", startPOI15);
+  $("poiStop").addEventListener("click", stopPOI);
+</script>
+</body>
+</html>
